@@ -8,6 +8,14 @@ on:
 # 添加权限设置
 permissions:
   contents: write
+push:
+    branches: [ master ]
+    paths:
+      - '.github/workflows/crawler.yml'
+      - 'config/**'
+      - 'requirements.txt'
+      - 'main.py'
+      - 'README.md'
 
   
 
