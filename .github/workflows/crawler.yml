@@ -1,14 +1,8 @@
 name: Hot News Crawler
 
 on:
-  schedule:
-    - cron: '*/50 * * * *'
   workflow_dispatch:
-
-# 添加权限设置
-permissions:
-  contents: write
-push:
+  push:
     branches: [ master ]
     paths:
       - '.github/workflows/crawler.yml'
@@ -16,7 +10,8 @@ push:
       - 'requirements.txt'
       - 'main.py'
       - 'README.md'
-
+  schedule:
+    - cron: '0,50 * * * *'   # UTC 每小时的 :00 和 :50
   
 
 jobs:
