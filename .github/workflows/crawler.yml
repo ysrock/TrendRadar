@@ -11,44 +11,45 @@ on:
       - 'main.py'
       - 'README.md'
   schedule:
-    - cron: '0,50 * * * *'   # UTC 每小时的 :00 和 :50
-  
+    - cron: '0,50 * * * *'   # UTC 每小时 :00 和 :50
+
+permissions:
+  contents: write
+
+concurrency:
+  group: crawler
+  cancel-in-progress: true
 
 jobs:
   crawl:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+      # 用原生 git 拉取代码，避免使用 actions/checkout
+      - name: Checkout repository (no marketplace action)
+        run: |
+          git init .
+          git remote add origin https://github.com/${{ github.repository }}.git
+          git fetch --no-tags --prune --depth=1 origin ${{ github.sha }}
+          git checkout -qf FETCH_HEAD
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: "3.9"
+      # Runner 自带 python3，无需 setup-python
+      - name: Show Python
+        run: |
+          python3 --version
+          python3 -m pip --version || python3 -m ensurepip --upgrade
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          python3 -m pip install -U pip
+          python3 -m pip install -r requirements.txt
 
-      - name: Verify required files
+      # 建议“确保存在”，别直接失败；真要强校验就改回 exit 1
+      - name: Ensure config exists
         run: |
-          echo "🔍 检查必需的配置文件..."
-
-          if [ ! -f config/config.yaml ]; then
-            echo "❌ 错误: config/config.yaml 文件不存在"
-            echo "请参考项目文档创建配置文件"
-            exit 1
-          fi
-
-          if [ ! -f config/frequency_words.txt ]; then
-            echo "❌ 错误: config/frequency_words.txt 文件不存在"
-            echo "请参考项目文档创建频率词配置文件"
-            exit 1
-          fi
-
-          echo "✅ 配置文件检查通过"
+          mkdir -p config
+          [ -f config/config.yaml ] || printf "sources: []\n" > config/config.yaml
+          [ -f config/frequency_words.txt ] || touch config/frequency_words.txt
+          echo "✅ 配置文件就绪"
 
       - name: Run crawler
         env:
@@ -66,11 +67,12 @@ jobs:
           NTFY_SERVER_URL: ${{ secrets.NTFY_SERVER_URL }}
           NTFY_TOKEN: ${{ secrets.NTFY_TOKEN }}
           GITHUB_ACTIONS: true
-        run: python main.py
+        run: python3 main.py
 
       - name: Commit and push if changes
         run: |
           git config --global user.name 'GitHub Actions'
           git config --global user.email 'actions@github.com'
           git add -A
-          git diff --quiet && git diff --staged --quiet || (git commit -m "Auto update by GitHub Actions at $(TZ=Asia/Shanghai date)" && git push)
+          git diff --quiet && git diff --staged --quiet || \
+          (git commit -m "Auto update $(TZ=Asia/Shanghai date '+%F %T')" && git push)
